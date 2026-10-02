@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Loom (SPSC relay: real ring + protocol double)
+      - name: "Loom (SPSC relay — real ring + protocol double)"
         run: cargo test --features loom --test loom_relay
 
   miri:
