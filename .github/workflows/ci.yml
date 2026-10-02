@@ -27,6 +27,7 @@ jobs:
       loom: false # loom runs in the dedicated job below (feature-gated, vane-style)
       wasm: false # platform-declared Linux: no wasm target
       miri: false # miri runs in the dedicated job below (FFI tests excluded)
+    secrets: inherit
 
   loom:
     name: loom model checking (completion relay)
