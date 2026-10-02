@@ -1,0 +1,62 @@
+[package]
+name = "uring-kit"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Reusable io_uring socket substrate — ring lifecycle, registered buffers, zero-copy ops, extracted from the vane edge proxy"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/WyattAu/uring-kit"
+readme = "README.md"
+keywords = ["io-uring", "networking", "linux", "splice", "async"]
+categories = ["network-programming", "os::linux-apis"]
+exclude = [".github/", "supply-chain/"]
+
+[dependencies]
+io-uring = "0.7"
+libc = "0.2"
+socket2 = { version = "0.6", features = ["all"] }
+loom = { version = "0.7", optional = true, default-features = false }
+
+[dev-dependencies]
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+tempfile = "3"
+
+[features]
+default = []
+# Loom model-checking of the lock-free completion relay (tests/loom_relay.rs,
+# src/relay_model.rs double). Off by default; the CI `loom` job turns it on.
+loom = ["dep:loom"]
+
+[[bench]]
+name = "ops_bench"
+harness = false
+
+# ---------------------------------------------------------------------------
+# Lint posture (documented deviation from Tier-A `forbid(unsafe_code)`):
+# io_uring is an FFI substrate — unsafe is inherent (SQE construction takes
+# raw pointers into engine-owned storage, registered buffers are handed to
+# the kernel as iovecs, sockaddrs are ABI structs). Instead of forbidding
+# unsafe, the crate denies `undocumented_unsafe_blocks` and
+# `unsafe_op_in_unsafe_fn`: every unsafe block carries a `// SAFETY:`
+# justification, and the crate-level `# Safety` section in lib.rs audits
+# every site. See also SECURITY.md (threat model).
+# ---------------------------------------------------------------------------
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+# `expect` is permitted for startup-only invariants and kernel-completion
+# assertions, each documented at its site (the vane-core posture this crate
+# was extracted from); `unwrap` stays denied.
+expect_used = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"

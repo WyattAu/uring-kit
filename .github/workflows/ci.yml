@@ -1,0 +1,65 @@
+# WyattAu engineering standards — Tier A (concurrency/latency-critical),
+# with the crate's documented safety posture (see Cargo.toml [lints] and
+# README § Safety): io_uring is an FFI substrate, so `unsafe_code` is NOT
+# forbidden — instead `undocumented_unsafe_blocks`/`unsafe_op_in_unsafe_fn`
+# are denied and every unsafe block carries a `// SAFETY:` audit
+# (crate-level `# Safety` section in lib.rs, SECURITY.md threat model).
+# All other Tier-A lints (unwrap/panic/indexing, missing_docs) are denied
+# exactly as the estate default.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    uses: WyattAu/engineering-standards/.github/workflows/rust-kit.yml@6d9ec87f34429c954121e5895fe8691ecca83cf8
+    with:
+      tier: a
+      all-features: true
+      loom: false # loom runs in the dedicated job below (feature-gated, vane-style)
+      wasm: false # platform-declared Linux: no wasm target
+      miri: false # miri runs in the dedicated job below (FFI tests excluded)
+
+  loom:
+    name: loom model checking (completion relay)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Loom (SPSC relay: real ring + protocol double)
+        run: cargo test --features loom --test loom_relay
+
+  miri:
+    name: miri (pure-logic modules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: Miri (token packing + buffer pool + relay)
+        # The uring/splice modules make raw syscalls miri cannot model;
+        # the pure-logic modules get the full check.
+        run: |
+          cargo +nightly miri test --lib token::
+          cargo +nightly miri test --lib buffer::
+          cargo +nightly miri test --lib relay::
+
+  bench-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Criterion smoke (sanity, not a gate)
+        run: cargo bench -- --test
