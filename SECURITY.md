@@ -1,4 +1,4 @@
-# Security Policy — uring-kit
+# Security Policy: uring-kit
 
 ## Supported versions
 
@@ -19,7 +19,7 @@ patch ships.
 [GitHub security advisories]:
     https://github.com/WyattAu/uring-kit/security/advisories/new
 
-## Threat model — io_uring attack surface
+## Threat model: io_uring attack surface
 
 Reference: STRIDE. Scope: the crate's public API (`UringEngine`,
 `BufferPool`, `splice`, `relay`, `probe`, `token`) across the kernel
@@ -54,15 +54,15 @@ privileged capability.
 | T2 | Sockaddr/iovec storage freed before kernel submit | Tampering (UAF) | `connect`, `connect_unix`, `read_vectored`, `write_vectored` | op-lifetime boxes parked in engine maps (`connect_addrs`, `vec_iovs`), released only when the CQE is observed; documented embedder contract for iovec *buffers* | `connect_refused_completes_with_error`, `connect_establishes_to_local_listener`, `vectored_write_then_read_roundtrip` |
 | T3 | fd reuse between submission and completion | Confused deputy | all ops | documented ownership contract: fd must stay valid until the CQE; `close` op exists so embedders close through the ring; accept fds are returned before re-arm | `close_op_completes`, `echo_round_trip_over_tcp_with_registered_buffers` |
 | T4 | Malicious/kernel-bug CQE floods or bogus `user_data` | Spoofing | `poll` | tokens are decoded defensively (foreign bits fall back to `Splice`, never panic); unknown-token CQEs are surfaced, not swallowed | `foreign_bits_fall_back_to_splice` |
-| T5 | Live-lock against a stalled splice peer | DoS | `splice::pump` | destination-EAGAIN spin is bounded (`DEST_SPIN_BUDGET`); the round returns a partial `Moved` and the pump is re-armed by readiness — vane's unbounded spin was deliberately not carried over | `splice_moved_and_eof_paths`, `splice_pump_moves_between_fds_via_engine` |
+| T5 | Live-lock against a stalled splice peer | DoS | `splice::pump` | destination-EAGAIN spin is bounded (`DEST_SPIN_BUDGET`); the round returns a partial `Moved` and the pump is re-armed by readiness: vane's unbounded spin was deliberately not carried over | `splice_moved_and_eof_paths`, `splice_pump_moves_between_fds_via_engine` |
 | T6 | Relay race: lost/duplicated/out-of-order completion | Tampering | `relay::SpscRing` | acquire/release sequence protocol, zero `SeqCst`; exhaustively model-checked under loom (double) plus interleaving tests on the real ring | `model_no_loss_no_duplication_fifo`, `model_backpressure_never_crosses_capacity`, `real_ring_handoff_order_under_all_interleavings` |
-| T7 | Kernel without io_uring (seccomp-filtered) assumed available | DoS (config) | `UringEngine::new` | construction is fallible; `probe::Probe::detect()` is the sanctioned availability check with opcode-level detail — callers must degrade gracefully | `probe_detects_the_test_kernel`, `detect_reports_capabilities` |
-| T8 | `SQPOLL` provisioned without permission | Elevation (config) | `UringEngine::new` | SQPOLL ring creation is fallible and probed (`Probe::sqpoll_permitted`); the documented fallback is a plain ring — no privilege assumptions | `sqpoll_construction_when_permitted` |
+| T7 | Kernel without io_uring (seccomp-filtered) assumed available | DoS (config) | `UringEngine::new` | construction is fallible; `probe::Probe::detect()` is the sanctioned availability check with opcode-level detail: callers must degrade gracefully | `probe_detects_the_test_kernel`, `detect_reports_capabilities` |
+| T8 | `SQPOLL` provisioned without permission | Elevation (config) | `UringEngine::new` | SQPOLL ring creation is fallible and probed (`Probe::sqpoll_permitted`); the documented fallback is a plain ring: no privilege assumptions | `sqpoll_construction_when_permitted` |
 | T9 | Unbounded accept SQE accumulation | DoS | `add_listener`/`accept` | exactly one accept SQE outstanding per listener, re-armed strictly on completion | `accept_flow_materializes_connection` |
 
 ### Repudiation
 
-Not applicable — a transport substrate has no audit surface. Callers
+Not applicable: a transport substrate has no audit surface. Callers
 needing audit trails should instrument at their layer.
 
 ### Out of scope
@@ -71,7 +71,7 @@ needing audit trails should instrument at their layer.
   (every SQE field is kernel-documented) but cannot defend the kernel
   from itself. Run supported kernels; keep seccomp policy in mind when
   embedding in multi-tenant environments.
-- TLS, HTTP, or any payload semantics — the layer is byte-transparent.
+- TLS, HTTP, or any payload semantics: the layer is byte-transparent.
 - Embedder violations of the ownership contract (closing an fd or
   freeing a buffer with ops in flight): documented, `debug_assert`ed
   where possible, but not preventable at this layer.
@@ -87,5 +87,5 @@ needing audit trails should instrument at their layer.
   embedders that cancel ops themselves should account for silent CQEs.
 - **R3 (Low, accepted):** `splice::pump`'s shared per-thread staging pipe
   is process-visible state (pipe fds); capacity is kernel-default (64
-  KiB) — high-fanout embedders wanting dedicated buffers per direction
+  KiB): high-fanout embedders wanting dedicated buffers per direction
   should use `SplicePipe` + `pump_via` explicitly.

@@ -1,33 +1,33 @@
 # uring-kit
 
-Reusable io_uring socket substrate for Rust — the shared kernel-bypass
+Reusable io_uring socket substrate for Rust: the shared kernel-bypass
 transport layer of the WyattAu estate, extracted from the
 [vane](https://github.com/WyattAu/vane) edge proxy. **Linux-only, by
 declaration** (L1 substrate: everything above it may assume this layer
 works).
 
 - **Ring lifecycle**: one `io_uring` instance per thread, optional
-  `SQPOLL` (kernel thread drains the SQ — zero syscalls on the hot path),
+  `SQPOLL` (kernel thread drains the SQ: zero syscalls on the hot path),
   bounded `poll` waits via `IORING_ENTER_EXT_ARG` with a fallback for
   older kernels.
 - **Registered buffer pools**: pre-allocated, stable-address slots handed
   to the kernel via `IORING_REGISTER_BUFFERS`; `READ_FIXED`/`WRITE_FIXED`
-  move bytes directly between kernel and pool — no per-op mapping, no
+  move bytes directly between kernel and pool: no per-op mapping, no
   hot-path allocation.
 - **Socket ops**: accept (single outstanding SQE, completion-driven
   re-arm), connect (INET + Unix, submission-safe owned sockaddrs),
   fixed-buffer read/write with partial-write resume, vectored read/write,
   `close`, multishot `POLL_ADD` readiness.
 - **Zero-copy splice**: `splice(2)` + `SPLICE_F_MOVE` through a kernel
-  pipe — L4 passthrough bytes never enter user space.
+  pipe: L4 passthrough bytes never enter user space.
 - **Feature probing**: kernel version (`uname`), opcode support
-  (`IORING_REGISTER_PROBE`), `SQPOLL` permission, ring params features —
+  (`IORING_REGISTER_PROBE`), `SQPOLL` permission, ring params features;
   degrade gracefully instead of guessing.
 - **Completion dispatch**: packed `Token` routing (`op|gen|slot|aux`)
   plus a cacheline-padded, lock-free SPSC relay for shipping completions
   off the engine thread (loom model-checked).
 - **Lint posture**: `unsafe` is inherent here (FFI substrate) and *not*
-  forbidden — instead every unsafe block carries a `// SAFETY:`
+  forbidden: instead every unsafe block carries a `// SAFETY:`
   justification (`clippy::undocumented_unsafe_blocks = deny`,
   `unsafe_op_in_unsafe_fn = deny`) and the crate docs audit every site.
 
@@ -39,7 +39,7 @@ uring-kit = "0.1"
 ```
 
 Any non-Linux target fails to compile with an explicit
-`compile_error!` — the platform is part of the contract, not an
+`compile_error!`: the platform is part of the contract, not an
 accident.
 
 ## Example
@@ -105,7 +105,7 @@ Extracted (one-directional copy + genericize, commit
 Still in vane (deliberately not extracted): `worker.rs` (thread-per-core
 runtime), `slab.rs` (session slab), `handler.rs`, `h2/`, `mio_engine.rs`
 (fallback backend), proxy routing/config. vane's migration to consume
-this crate is tracked in its own repository — this extraction does not
+this crate is tracked in its own repository: this extraction does not
 modify vane.
 
 ## Platform
@@ -113,7 +113,7 @@ modify vane.
 Linux kernel ≥ 5.1 (io_uring baseline with registered buffers). Use
 [`Probe::detect`](https://docs.rs/uring-kit) to check what the running
 kernel actually supports (opcodes, `SQPOLL`, multishot poll, `EXT_ARG`).
-Several distributions seccomp-filter io_uring — never assume; probe.
+Several distributions seccomp-filter io_uring: never assume; probe.
 
 ## Safety
 
@@ -139,7 +139,7 @@ cargo bench                      # criterion: ring round-trip, pool, splice, rel
 ```
 
 CI runs the estate Tier-A gate matrix (check/test/clippy/fmt/deny/vet/
-coverage ≥ 90%/semver) plus dedicated loom and miri jobs — see
+coverage ≥ 90%/semver) plus dedicated loom and miri jobs: see
 `.github/workflows/ci.yml`.
 
 ## License

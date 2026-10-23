@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project are documented here. Format: [Keep a
-Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
+Changelog](https://keepachangelog.com/): versions follow [semver](https://semver.org).
 
 ## [0.1.0] - 2026-10-02
 
@@ -29,7 +29,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 - `token`: packed 64-bit completion tokens (`op:8|gen:16|slot:24|aux:16`)
   with direction-neutral op set (`Accept`/`Read`/`Write`/`Connect`/
   `Close`/`Splice`).
-- `probe`: kernel/feature detection — ring availability, opcode support
+- `probe`: kernel/feature detection: ring availability, opcode support
   via `IORING_REGISTER_PROBE`, `SQPOLL` permission, `EXT_ARG`/`NODROP`
   params features, `uname` version parsing.
 - `relay`: cacheline-padded lock-free SPSC completion relay (zero
@@ -45,6 +45,6 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
   handoff).
 - Estate Tier-A gates: lints (deny `undocumented_unsafe_blocks`,
   `unsafe_op_in_unsafe_fn`, `unwrap_used`, `panic`, `indexing_slicing`,
-  `missing_docs` — documented deviation from `forbid(unsafe_code)`;
+  `missing_docs`: documented deviation from `forbid(unsafe_code)`;
   unsafe is inherent to the FFI substrate and every block carries a
   `// SAFETY:` audit), cargo-deny, cargo-vet, loom + miri CI jobs.
