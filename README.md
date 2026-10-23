@@ -1,4 +1,5 @@
 # uring-kit
+[![Estate integration](https://github.com/WyattAu/estate-integration/actions/workflows/ci.yml/badge.svg)](https://github.com/WyattAu/estate-integration/actions/workflows/ci.yml)
 
 Reusable io_uring socket substrate for Rust: the shared kernel-bypass
 transport layer of the WyattAu estate, extracted from the
