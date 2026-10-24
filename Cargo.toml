@@ -1,9 +1,9 @@
 [package]
 name = "uring-kit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.85"
-description = "Reusable io_uring socket substrate — ring lifecycle, registered buffers, zero-copy ops, extracted from the vane edge proxy"
+description = "Reusable io_uring socket substrate: ring lifecycle, registered buffers, zero-copy socket ops (Linux)"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/WyattAu/uring-kit"
 readme = "README.md"
