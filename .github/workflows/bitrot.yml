@@ -17,7 +17,7 @@ jobs:
           args: --no-progress --max-retries 2 './**/*.md'
       - name: upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lychee-report
           path: lychee-report.json
