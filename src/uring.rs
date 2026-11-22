@@ -513,6 +513,13 @@ impl Engine for UringEngine {
             );
             self.accepted.insert(fd, addr);
             self.arm_accept(bits);
+            // Surface the completion: the consumer owns the accepted fd and
+            // queries take_accepted(fd) for the peer address. Without this
+            // push the connection is accepted invisibly and never served.
+            out.push(Cqe {
+                token,
+                result: Ok(fd as u32),
+            });
         }
         Ok(())
     }

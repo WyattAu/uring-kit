@@ -94,6 +94,33 @@ fn ring_lifecycle_pool_registration_and_teardown() {
 }
 
 #[test]
+fn accept_completion_surfaces_via_poll() {
+    // Regression (2026-11-22): the drain materialized accepted fds into
+    // take_accepted() and re-armed the listener but never surfaced the
+    // accept CQE, so completion-driven consumers never saw new connections.
+    let listener = uring_kit::net::tcp_listener("127.0.0.1:0".parse().expect("addr"), false, 16)
+        .expect("bind");
+    let addr = listener.local_addr().expect("addr");
+    let lfd = listener.as_raw_fd();
+    let pool = BufferPool::new(8, DEFAULT_BUF_SIZE).expect("pool");
+    let mut engine = UringEngine::new(32, Some(&pool), false).expect("ring");
+    let at = Token::accept(0);
+    engine.add_listener(lfd, at).expect("register");
+
+    let _client = std::net::TcpStream::connect(addr).expect("dial");
+    let cqes = drain_until(&mut engine, |c| c.token.op() == Op::Accept);
+    let hit = cqes
+        .iter()
+        .find(|c| c.token.op() == Op::Accept)
+        .expect("accept CQE surfaced via poll");
+    let fd = *hit.result.as_ref().expect("accepted fd");
+    assert!(fd > 0, "accept result is the new fd");
+    assert!(engine.take_accepted(fd as RawFd).is_some(), "peer address available");
+    // SAFETY: test-owned accepted fd.
+    unsafe { libc::close(fd as libc::c_int) };
+}
+
+#[test]
 fn echo_round_trip_over_tcp_with_registered_buffers() {
     let listener = uring_kit::net::tcp_listener("127.0.0.1:0".parse().expect("addr"), false, 16)
         .expect("bind");
