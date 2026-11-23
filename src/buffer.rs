@@ -36,6 +36,20 @@ impl BufferPool {
     /// granularity); power-of-two sizes and capacities are `io_uring`
     /// registration-friendly but not enforced.
     #[must_use]
+    /// Creates a pool of `capacity` buffers of `buf_size` bytes each, all
+    /// registered with the ring via `IORING_REGISTER_BUFFERS`.
+    ///
+    /// # RLIMIT_MEMLOCK
+    ///
+    /// Registered buffers are kernel-pinned and counted against
+    /// `RLIMIT_MEMLOCK`. Large pools (e.g., 16k × 2 KB = 32 MB for a
+    /// connection-per-slot server) will fail with ENOMEM under a systemd
+    /// unit carrying the 8 MB default limit. Size pools to fit the limit,
+    /// raise the limit in the unit (`LimitMEMLOCK=infinity`), or use
+    /// unregistered per-op buffers instead.
+    ///
+    /// Returns `None` when `capacity` or `buf_size` is zero, or when the
+    /// backing allocation fails.
     pub fn new(capacity: usize, buf_size: usize) -> Option<Self> {
         if capacity == 0 || buf_size == 0 {
             return None;
