@@ -96,6 +96,17 @@ pub trait Engine {
     /// Queues a vectored write from caller-owned iovecs (same lifetime
     /// contract as [`Engine::read_vectored`]).
     ///
+    /// # Partial writes
+    ///
+    /// The CQE result is the number of bytes **written**, which may be
+    /// less than the total iovec length — short writes are normal under
+    /// socket-buffer backpressure, not an error. The caller must track
+    /// progress (bytes consumed per iovec) and resubmit the remainder
+    /// with the same buffer contents until the CQE reports the full
+    /// length. Advancing per-connection queues past the frame on any
+    /// successful CQE silently truncates responses; only pop buffered
+    /// state once the written count covers it.
+    ///
     /// # Errors
     /// Submission failure (not `EAGAIN`).
     fn write_vectored(
