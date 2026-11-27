@@ -37,6 +37,10 @@ pub struct UringFlags {
     pub coop_taskrun: bool,
     /// SINGLE_ISSUER: exactly one submitter thread (skips locking).
     pub single_issuer: bool,
+    /// DEFER_TASKRUN: task work runs only at the submitter's enter()
+    /// (kernel 6.1+; requires COOP_TASKRUN). Ideal for a single-thread
+    /// pass loop — no IPI wakeups at all.
+    pub defer_taskrun: bool,
 }
 
 /// Listener state (accept re-arms after each connection).
@@ -161,6 +165,9 @@ impl UringEngine {
         }
         if flags.coop_taskrun {
             bld.setup_coop_taskrun();
+        }
+        if flags.defer_taskrun {
+            bld.setup_defer_taskrun();
         }
         if flags.single_issuer {
             bld.setup_single_issuer();
