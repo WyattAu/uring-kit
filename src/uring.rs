@@ -28,6 +28,17 @@ use crate::engine::{Cqe, Engine, Poll};
 use crate::splice;
 use crate::token::{Op, Token};
 
+/// Setup flags for the ring.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct UringFlags {
+    /// Kernel-side submission polling (root/memlock restricted).
+    pub sqpoll: bool,
+    /// COOP_TASKRUN: completions do not IPI the submitter.
+    pub coop_taskrun: bool,
+    /// SINGLE_ISSUER: exactly one submitter thread (skips locking).
+    pub single_issuer: bool,
+}
+
 /// Listener state (accept re-arms after each connection).
 struct Listener {
     fd: RawFd,
@@ -121,13 +132,40 @@ impl UringEngine {
     /// Ring creation or registration failure (e.g., SQPOLL denied for the
     /// current user).
     pub fn new(entries: u32, pool: Option<&BufferPool>, sqpoll: bool) -> io::Result<Self> {
-        let build: io::Result<io_uring::IoUring> = if sqpoll {
-            io_uring::IoUring::builder()
-                .setup_sqpoll(2_000)
-                .build(entries)
-        } else {
-            io_uring::IoUring::new(entries)
-        };
+        Self::new_with_flags(
+            entries,
+            pool,
+            UringFlags {
+                sqpoll,
+                ..UringFlags::default()
+            },
+        )
+    }
+
+    /// Flag-driven ring setup (the ch47 A/B levers): SQPOLL (kernel-side
+    /// submission polling; needs root or generous memlock — often
+    /// DENIED for unprivileged users), COOP_TASKRUN (avoids IPI-wake
+    /// overhead when the submitter polls completions), SINGLE_ISSUER
+    /// (declares one submitter thread; kernel skips locking).
+    /// # Errors
+    /// Ring creation or registration failure (e.g., SQPOLL denied for
+    /// the current user).
+    pub fn new_with_flags(
+        entries: u32,
+        pool: Option<&BufferPool>,
+        flags: UringFlags,
+    ) -> io::Result<Self> {
+        let mut bld = io_uring::IoUring::builder();
+        if flags.sqpoll {
+            bld.setup_sqpoll(2_000);
+        }
+        if flags.coop_taskrun {
+            bld.setup_coop_taskrun();
+        }
+        if flags.single_issuer {
+            bld.setup_single_issuer();
+        }
+        let build = bld.build(entries);
         let ring = build?;
         let (slot_bases, buf_size) = match pool {
             Some(pool) => {
