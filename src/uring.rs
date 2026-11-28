@@ -167,6 +167,11 @@ impl UringEngine {
             bld.setup_coop_taskrun();
         }
         if flags.defer_taskrun {
+            // kernel requirement: DEFER_TASKRUN depends on
+            // SINGLE_ISSUER (deferred task work is bound to one issuer
+            // thread) — set it automatically (EINVAL otherwise, seen
+            // on kernel 6.8)
+            bld.setup_single_issuer();
             bld.setup_defer_taskrun();
         }
         if flags.single_issuer {
