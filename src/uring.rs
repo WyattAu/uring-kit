@@ -471,17 +471,26 @@ impl Engine for UringEngine {
         // no-op `enter(0,0,0)` flushes on empty SQs (seen as ~1.2 wasted
         // syscalls/iteration in the strace profile).
         // 1. flush only when SQEs are pending (empty-SQ submit = pure
-        //    round-trip);
+        //    round-trip). EBUSY means the CQ ring is full — the drain
+        //    below unblocks it; erroring out would spin (a 205k-enter
+        //    99.8%-error loop under saturation taught this the hard way).
         if self.ring.submission().len() > 0 {
-            self.ring.submit()?;
+            if let Err(e) = self.ring.submit() {
+                if e.raw_os_error() != Some(libc::EBUSY) {
+                    return Err(e);
+                }
+            }
         }
         // 2. wait only when no completions are already queued — CQEs
         //    sitting in the CQ ring are consumable without any enter.
+        //    Same EBUSY tolerance: with a full CQ the drain is the
+        //    progress, waiting would be wrong.
         if self.ring.completion().len() == 0 {
             match timeout {
                 None => match self.ring.submit_and_wait(1) {
                     Ok(_) => {}
                     Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                    Err(e) if e.raw_os_error() == Some(libc::EBUSY) => {}
                     Err(e) => return Err(e),
                 },
                 Some(d) => {
@@ -495,6 +504,7 @@ impl Engine for UringEngine {
                         Ok(_) => {}
                         Err(e) if e.raw_os_error() == Some(libc::ETIME) => return Ok(()),
                         Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                        Err(e) if e.raw_os_error() == Some(libc::EBUSY) => {}
                         Err(_) => {
                             // Fallback for kernels without EXT_ARG: plain wait.
                             self.ring.submit_and_wait(0)?;
