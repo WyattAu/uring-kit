@@ -466,29 +466,39 @@ impl Engine for UringEngine {
     }
 
     fn poll(&mut self, timeout: Option<Duration>, out: &mut Vec<Cqe>) -> io::Result<()> {
-        // Flush submissions (no-op under SQPOLL — kernel thread drains).
-        self.ring.submit()?;
-
-        match timeout {
-            None => match self.ring.submit_and_wait(1) {
-                Ok(_) => {}
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(e),
-            },
-            Some(d) => {
-                // Bounded wait via IORING_ENTER_EXT_ARG; ETIME = clean timeout.
-                let ms = d.as_millis().min(60_000) as u64;
-                let ts = Timespec::new()
-                    .sec(ms / 1_000)
-                    .nsec((ms % 1_000) as u32 * 1_000_000);
-                let args = SubmitArgs::new().timespec(&ts);
-                match self.ring.submitter().submit_with_args(1, &args) {
+        // CL-001d adaptive enter policy: skip syscall rounds that provably
+        // do nothing. The naive sequence was 2 enters per pass, including
+        // no-op `enter(0,0,0)` flushes on empty SQs (seen as ~1.2 wasted
+        // syscalls/iteration in the strace profile).
+        // 1. flush only when SQEs are pending (empty-SQ submit = pure
+        //    round-trip);
+        if self.ring.submission().len() > 0 {
+            self.ring.submit()?;
+        }
+        // 2. wait only when no completions are already queued — CQEs
+        //    sitting in the CQ ring are consumable without any enter.
+        if self.ring.completion().len() == 0 {
+            match timeout {
+                None => match self.ring.submit_and_wait(1) {
                     Ok(_) => {}
-                    Err(e) if e.raw_os_error() == Some(libc::ETIME) => return Ok(()),
                     Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
-                    Err(_) => {
-                        // Fallback for kernels without EXT_ARG: plain wait.
-                        self.ring.submit_and_wait(0)?;
+                    Err(e) => return Err(e),
+                },
+                Some(d) => {
+                    // Bounded wait via IORING_ENTER_EXT_ARG; ETIME = clean timeout.
+                    let ms = d.as_millis().min(60_000) as u64;
+                    let ts = Timespec::new()
+                        .sec(ms / 1_000)
+                        .nsec((ms % 1_000) as u32 * 1_000_000);
+                    let args = SubmitArgs::new().timespec(&ts);
+                    match self.ring.submitter().submit_with_args(1, &args) {
+                        Ok(_) => {}
+                        Err(e) if e.raw_os_error() == Some(libc::ETIME) => return Ok(()),
+                        Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                        Err(_) => {
+                            // Fallback for kernels without EXT_ARG: plain wait.
+                            self.ring.submit_and_wait(0)?;
+                        }
                     }
                 }
             }
